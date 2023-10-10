@@ -21,7 +21,6 @@ my_program: $(OBJ)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Test compilation
-test: CXXFLAGS += -DRUN_TESTS  # Add flag to define RUN_TESTS
 test: $(filter-out main.o, $(OBJ)) $(TEST_OBJ)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
@@ -35,3 +34,4 @@ clean:
 
 # Phony targets
 .PHONY: all test run_tests clean
+
