@@ -1,19 +1,37 @@
-CC = g++
-CFLAGS = -g -Wall
-TARGET = reader
+# Compiler and flags
+CXX = g++
+CXXFLAGS = -Iinclude
 
-# Use wildcard to find all .cpp files and then determine the object files from them
-SRCS = $(wildcard *.cpp)
-OBJS = $(SRCS:.cpp=.o)
+# Source and object files
+SRC = $(wildcard src/*.cpp) main.cpp
+OBJ = $(SRC:.cpp=.o)
 
-all: $(TARGET)
+# Test source and object files
+TEST_SRC = $(wildcard tests/*.cpp)
+TEST_OBJ = $(TEST_SRC:.cpp=.o)
 
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+# Targets
+all: my_program
 
+my_program: $(OBJ)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+# Pattern rule for object files
 %.o: %.cpp
-	$(CC) $(CFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+# Test compilation
+test: CXXFLAGS += -DRUN_TESTS  # Add flag to define RUN_TESTS
+test: $(filter-out main.o, $(OBJ)) $(TEST_OBJ)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+# Run tests
+run_tests: test
+	./test
+
+# Clean
 clean:
-	$(RM) $(TARGET) $(OBJS)
+	rm -f my_program test $(OBJ) $(TEST_OBJ)
 
+# Phony targets
+.PHONY: all test run_tests clean
