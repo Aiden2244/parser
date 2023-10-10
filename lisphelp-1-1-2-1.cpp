@@ -79,7 +79,7 @@ EXP currentExp;
 char userinput[MAXINPUT];
 int   inputleng, pos;
 
-char*   printNames[MAXNAMES];
+string   printNames[MAXNAMES];
 int   numNames, numBuiltins;
 
 int   quittingtime;
@@ -181,6 +181,12 @@ int lengthVL ( VALUELIST vl)
 
 int lengthNL ( NAMELIST nl)
 {
+    int len = 0;
+    while (nl != 0) {
+        len++;
+        nl = nl->tail;
+    }
+    return len;
 }/* lengthNL */
 
 /*****************************************************************
@@ -219,7 +225,7 @@ void  newFunDef (NAME fname,  NAMELIST nl, EXP e)
 
 void initNames()
 {
-   int i =1;
+   int i = 1;
    fundefs = 0;
    printNames[i] = "if"; i++;
    printNames[i] = "while"; i++;
@@ -239,22 +245,22 @@ void initNames()
 
 /* install - insert new name into printNames  */
 
-NAME install ( char* nm)
+NAME install (string nm)
 {
    int i = 0;
    while (i <= numNames) {
-	 if (strcmp( nm,printNames[i] ) == 0)
-	    break;
-     i++;
+      if (nm == printNames[i])
+         break;
+      i++;
    }
    if (i > numNames)
    {
-	  numNames = i;
-	  printNames[i] = new char[strlen(nm) + 1];
-	  strcpy(printNames[i], nm);
+      numNames = i;
+      printNames[i] = nm;
    }
    return i;
 }// install
+
 
 /* prName - print name nm              */
 
