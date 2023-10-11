@@ -449,38 +449,34 @@ EXPLIST parseEL();
 
 EXP parseExp()
 {
-    pos = skipblanks(pos);  // Skip initial whitespace
+    pos = skipblanks(pos);
     if (userinput[pos] == '(' ) {
-       pos = skipblanks(pos + 1);  // Skip whitespace after the opening parenthesis
+       pos = skipblanks(pos + 1);  
        NAME op = parseName();
-       if (op == -1) {  // Assuming parseName returns -1 on failure
-           cout << "Error: Failed to parse operator name at position " << pos << endl;
-           return nullptr;
-       }
-       pos = skipblanks(pos);  // Skip any whitespace after the parsed operator name
+       pos = skipblanks(pos); 
        EXPLIST el = parseEL();
-       if (el == nullptr && userinput[pos] != ')') {  // Check for error in parseEL (assuming parseEL returns nullptr on failure)
+       if (el == nullptr && userinput[pos] != ')') {  
            cout << "Error: Failed to parse expression list or missing closing parenthesis at position " << pos << endl;
            return nullptr;
        }
-       pos = skipblanks(pos + 1);  // Skip any whitespace after the parsed expression list and the closing parenthesis
+       pos = skipblanks(pos + 1); 
        return mkAPEXP(op, el);
     }
     if (isNumber(pos)) {
        EXP e = mkVALEXP(parseVal());
-       if (e == nullptr) {  // Check for error in mkVALEXP (assuming mkVALEXP returns nullptr on failure)
+       if (e == nullptr) {  
            cout << "Error: Failed to parse value at position " << pos << endl;
            return nullptr;
        }
-       pos = skipblanks(pos);  // Skip any whitespace after the parsed value
+       pos = skipblanks(pos); 
        return e;
     }
     EXP e = mkVAREXP(parseName());
-    if (e == nullptr) {  // Check for error in mkVAREXP (assuming mkVAREXP returns nullptr on failure)
+    if (e == nullptr) { 
         cout << "Error: Failed to parse name at position " << pos << endl;
         return nullptr;
     }
-    pos = skipblanks(pos);  // Skip any whitespace after the parsed name
+    pos = skipblanks(pos);  
     return e;
 }// parseExp
 
@@ -496,11 +492,11 @@ EXPLIST parseEL()
     if (userinput[pos] == ')' ) {
       pos = skipblanks(pos + 1);
       
-      return nullptr; // Changed from 0 to nullptr for clarity
+      return nullptr; 
     }
     EXP e = parseExp();
     if (e == nullptr) {
-        return nullptr; // Return nullptr immediately if parseExp() fails
+        return nullptr; 
     }
     pos = skipblanks(pos);
     EXPLIST el = parseEL();
@@ -642,6 +638,16 @@ int arity ( int op)
 	    return 2;
 	 return  1;
 }// arity
+
+
+/**********************************************************************/
+/**********************************************************************/
+/**       THE FUNCTIONS BELOW THIS POINT ARE NOT REQUIRED FOR        **/
+/**       PART 2. THEY ARE EXPERIMENTAL AND DO NOT BEHAVE AS         **/
+/**       INTENDED. PLEASE DISREGARD FOR THIS SUBMISSION.            **/
+/**********************************************************************/
+/**********************************************************************/
+
 
 /* applyValueOp - apply VALUEOP op to arguments in VALUELIST vl */
 
@@ -872,10 +878,8 @@ NUMBER eval(EXP e, ENV rho)
 int main()
 {
     initNames();
-    cout << "Names initialized" << endl;
    
     globalEnv = emptyEnv();
-    cout << "Empty env created" << endl;
 
 
     quittingtime = 0;
@@ -889,9 +893,7 @@ int main()
         cout <<endl;
     }
     else {
-        cout << "In the else block" << endl;
         currentExp = parseExp();
-        cout << "Current expression: " << currentExp << endl;
         prValue(eval(currentExp, emptyEnv() ));
         cout <<endl<<endl;
     }
