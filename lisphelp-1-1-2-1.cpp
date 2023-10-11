@@ -77,9 +77,9 @@ ENV globalEnv;
 EXP currentExp;
 
 char userinput[MAXINPUT];
-int   inputleng, pos;
+int   inputleng, pos = 0;
 
-string   printNames[MAXNAMES];
+const char*   printNames[MAXNAMES];
 int   numNames, numBuiltins;
 
 int   quittingtime;
@@ -245,7 +245,7 @@ void initNames()
 
 /* install - insert new name into printNames  */
 
-NAME install (string nm)
+NAME install (char* nm)
 {
    int i = 0;
    while (i <= numNames) {
@@ -264,9 +264,9 @@ NAME install (string nm)
 
 /* prName - print name nm              */
 
-void prName ( NAME nm)
+void prName (NAME nm)
 {
-	 cout<< printNames[nm];
+	 cout << printNames[nm];
 } //prName
 
 /*****************************************************************
@@ -292,7 +292,7 @@ int skipblanks (int p)
 
 /* matches - check if string nm matches userinput[s .. s+leng]   */
 
-int matches (int s, int leng,  char* nm)
+int matches (int s, int leng,  const char* nm)
 {
    int i=0;
    while (i < leng )
@@ -326,7 +326,7 @@ void nextchar (char& c)
 void readParens()
 {
    int parencnt; /* current depth of parentheses */
-   char c;
+   char c = '\0';
    parencnt = 1; // '(' just read
    do
    {
@@ -459,17 +459,25 @@ EXPLIST parseEL();
 
 EXP parseExp()
 {
-    pos = skipblanks(pos);
+    pos = skipblanks(pos);  // Skip initial whitespace
     if (userinput[pos] == '(' ) {
-       pos = skipblanks(pos+1);
+       pos = skipblanks(pos + 1);  // Skip whitespace after the opening parenthesis
        NAME op = parseName();
+       pos = skipblanks(pos);  // Skip any whitespace after the parsed operator name
        EXPLIST el = parseEL();
+       pos = skipblanks(pos);  // Skip any whitespace after the parsed expression list
        return mkAPEXP(op, el);
     }
-    if ( isNumber(pos) )
-       return mkVALEXP(parseVal());
-    return mkVAREXP(parseName());
+    if (isNumber(pos)) {
+       EXP e = mkVALEXP(parseVal());
+       pos = skipblanks(pos);  // Skip any whitespace after the parsed value
+       return e;
+    }
+    EXP e = mkVAREXP(parseName());
+    pos = skipblanks(pos);  // Skip any whitespace after the parsed name
+    return e;
 }// parseExp
+
 
 /* parseEL - return EXPLIST starting at userinput[pos]  */
 
@@ -477,13 +485,20 @@ EXPLIST parseEL()
 {
     pos = skipblanks(pos);
     if (userinput[pos] == ')' ) {
-      pos = skipblanks(pos+1);
+      pos = skipblanks(pos + 1);
+      cout << pos << endl;
       return 0;
     }
     EXP e = parseExp();
+    if (e == nullptr) {  // Assuming parseExp() returns nullptr on failure
+        // Handle error or break recursion
+        return 0;
+    }
+    pos = skipblanks(pos);  // Ensure pos is updated correctly
     EXPLIST el = parseEL();
     return mkExplist(e, el); 
 }// parseEL
+
 
 
 /* parseNL - return NAMELIST starting at userinput[pos]  */
@@ -543,7 +558,22 @@ void bindVar ( NAME nm,  NUMBER n,  ENV rho)
 VALUELIST findVar ( NAME nm, ENV rho)
 {
   
-  
+    NAMELIST varList = rho->vars;
+    VALUELIST valList = rho->values;
+
+    // Iterate through the environment
+    while (varList != nullptr && valList != nullptr)
+    {
+        if (varList->head == nm)  // If the variable is found
+        {
+            return valList;  // Return its associated value
+        }
+        varList = varList->tail;
+        valList = valList->tail;
+    }
+
+    // Variable not found
+    return nullptr;
   
 }
 
@@ -606,43 +636,225 @@ int arity ( int op)
 
 /* applyValueOp - apply VALUEOP op to arguments in VALUELIST vl */
 
-NUMBER applyValueOp ( int op,  VALUELIST vl)
+NUMBER applyValueOp(int op, VALUELIST vl)
 {
-}// applyValueOp
+    // Ensure there are enough arguments in the VALUELIST for the operation.
+    int argCount = lengthVL(vl);
+    if (argCount < arity(op))
+    {
+        cout << "Error: insufficient arguments for operation" << endl;
+        exit(1);
+    }
+
+    // Access the arguments from the VALUELIST.
+    NUMBER arg1 = vl->head;
+    NUMBER arg2 = 0;
+    if (argCount > 1)
+        arg2 = vl->tail->head;
+
+    // Perform the specified operation.
+    switch (op)
+    {
+    case 5: 
+        return arg1 + arg2;
+    case 6: 
+        return arg1 - arg2;
+    case 7: 
+        return arg1 * arg2;
+    case 8: 
+        if (arg2 == 0)
+        {
+            cout << "Error: division by zero" << endl;
+            exit(1);
+        }
+        return arg1 / arg2;
+    // ... other cases for other operators
+    case 9:
+        return arg1 == arg2;
+    case 10:
+        return arg1 > arg2;
+    case 11:
+        return arg1 < arg2;
+    default:
+        cout << "Error: unknown operator" << endl;
+        exit(1);
+    }
+}
+ // applyValueOp
 
 
 /*****************************************************************
  *                     EVALUATION                                *
  *****************************************************************/
 
-/* evalList - evaluate each expression in el */
-NUMBER eval ( EXP e,  ENV rho);
+// eval - return value of expression e in local environment rho
+NUMBER eval(EXP e, ENV rho);
 
-VALUELIST evalList ( EXPLIST el, ENV rho)
+/* evalList - evaluate each expression in el */
+VALUELIST evalList(EXPLIST el, ENV rho)
 {
-}// evalList
+    // Base case: if the expression list is empty, return an empty value list
+    if (el == nullptr)
+    {
+        return nullptr;
+    }
+
+    // Recursive case: evaluate the head expression, then recursively evaluate the tail
+    NUMBER headValue = eval(el->head, rho);  // Evaluate the head expression
+    VALUELIST tailValues = evalList(el->tail, rho);  // Recursively evaluate the tail
+
+    // Construct a new value list node with the evaluated head value and the evaluated tail values
+    VALUELIST newValueList = mkValuelist(headValue, tailValues);
+
+    return newValueList;
+}
+
 
 /* applyUserFun - look up definition of nm and apply to actuals  */
 
-NUMBER applyUserFun ( NAME nm, VALUELIST actuals)
+NUMBER applyUserFun(NAME fname, VALUELIST actuals)
 {
-}// applyUserFun
+    // Look up the function definition in the global function definitions
+    FUNDEF f = fetchFun(fname);
+
+    // Check if the function definition was found
+    if (f == nullptr)
+    {
+        cout << "Error: undefined function " << printNames[fname] << endl;
+        exit(1);
+    }
+
+    // Check if the number of actual arguments matches the number of formal parameters
+    NAMELIST formals = f->formals;
+    if (lengthVL(actuals) != lengthNL(formals))
+    {
+        cout << "Error: argument count mismatch for function " << printNames[fname] << endl;
+        exit(1);
+    }
+
+    // Create a new environment with bindings for the formal parameters to the actual arguments
+    ENV newEnv = mkEnv(nullptr, nullptr);
+    while (formals != nullptr && actuals != nullptr)
+    {
+        bindVar(formals->head, actuals->head, newEnv);
+        formals = formals->tail;
+        actuals = actuals->tail;
+    }
+
+    // Evaluate the function body in the new environment
+    NUMBER result = eval(f->body, newEnv);
+
+    return result;
+}
+
+ // applyUserFun
 
 /* applyCtrlOp - apply CONTROLOP op to args in rho   */
-
-NUMBER applyCtrlOp ( int op,  EXPLIST args, ENV rho )
+NUMBER applyCtrlOp(int op, EXPLIST args, ENV rho)
 {
+    if (args->tail == nullptr) {
+        cout << "Error: args should have something following it" << endl;
+        exit(1);
+    }
+
+    switch(op)
+    {
+        case 1:  // "if" operator
+        {
+            // Evaluate the condition
+            NUMBER condVal = eval(args->head, rho);
+            args = args->tail;
+
+            // If condition is true, evaluate the first branch, else evaluate the second branch
+            if (isTrueVal(condVal))
+                return eval(args->head, rho);
+            else
+                return eval(args->tail->head, rho);
+        }
+        case 2:  // "while" operator
+        {
+            // Extract the condition and body expressions
+            EXP condExp = args->head;
+            EXP bodyExp = args->tail->head;
+
+            // While the condition is true, evaluate the body
+            while (isTrueVal(eval(condExp, rho)))
+                eval(bodyExp, rho);
+
+            return 0;  // Return 0 after the loop exits
+        }
+        case 3:  // "set" operator
+        {
+            // Extract the variable name and the new value expression
+            NAME varName = args->head->varble;
+            EXP newValExp = args->tail->head;
+
+            // Evaluate the new value expression and assign it to the variable
+            NUMBER newVal = eval(newValExp, rho);
+            assign(varName, newVal, rho);
+
+            return newVal;  // Return the new value
+        }
+        case 4:  // "begin" operator
+        {
+            // Evaluate each expression in the list, returning the value of the last one
+            NUMBER lastVal = 0;
+            while (args != nullptr)
+            {
+                lastVal = eval(args->head, rho);
+                args = args->tail;
+            }
+
+            return lastVal;
+        }
+        case 12:  // "print" operator
+        {
+            // Evaluate the expression to be printed and print it
+            NUMBER val = eval(args->head, rho);
+            prValue(val);
+            cout << endl;
+
+            return val;  // Return the value that was printed
+        }
+        default:
+            cout << "Error: unknown control operator" << endl;
+            exit(1);
+    }
 }// applyCtrlOp
 
-// eval - return value of expression e in local environment rho
-
-NUMBER eval ( EXP e,  ENV rho)
+NUMBER eval(EXP e, ENV rho)
 {
-       
-       
-       
-       
-} // eval
+    switch (e->etype)
+    {
+        case VALEXP:
+            return e->num;  // Return the number directly for value expressions.
+        case VAREXP:
+        {
+            // Look up the variable in the environment and return its value.
+            VALUELIST vl = findVar(e->varble, rho);
+            if (vl != nullptr)
+                return vl->head;
+            else
+            {
+                cout << "Error: unbound variable" << endl;
+                exit(1);
+            }
+            break;
+        }
+        case APEXP:
+        {
+            // Evaluate the operator and arguments, then apply the operator to the arguments.
+            NAME op = e->optr;
+            EXPLIST args = e->args;
+            VALUELIST argValues = evalList(args, rho);
+            return applyValueOp(op - '0', argValues);
+        }
+        default:
+            cout << "Error: unknown expression type" << endl;
+            exit(1);
+    }
+}
+
 
 /*****************************************************************
  *                     READ-EVAL-PRINT LOOP                      *
@@ -673,5 +885,3 @@ int main()
 	}// while
   return 0;
 }
-
-
