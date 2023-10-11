@@ -282,12 +282,13 @@ int isDelim (char c)
 
 /* skipblanks - return next non-blank position in userinput */
 
-int skipblanks (int p)
-{
-   while (userinput[p] == ' ')
-	++p;
-   return p;
+int skipblanks(int position) {
+    while (isspace(userinput[position])) {
+        position++;
+    }
+    return position;
 }
+
 
 
 /* matches - check if string nm matches userinput[s .. s+leng]   */
@@ -311,86 +312,75 @@ int matches (int s, int leng,  const char* nm)
 
 /* nextchar - read next char - filter tabs and comments */
 
-void nextchar (char& c)
-{
+void nextchar(char& c) {
     scanf("%c", &c);
-    if (c == COMMENTCHAR )
-    {
-	  while ( c != '\n' )
-		scanf("%c",&c);
+    while (c == COMMENTCHAR || c == '\t' || c == '\r') {
+        if (c == COMMENTCHAR) {
+            while (c != '\n' && scanf("%c", &c));  // Skip comments
+        } else {
+            scanf("%c", &c);  // Skip tabs and carriage returns
+        }
     }
 }
 
 
+
 /* readParens - read char's, ignoring newlines, to matching ')' */
-void readParens()
-{
-   int parencnt; /* current depth of parentheses */
-   char c = '\0';
-   parencnt = 1; // '(' just read
-   do
-   {
-	  if (c == '\n')
-	    cout <<PROMPT2;
-	  nextchar(c);
-	  pos++;
-	  if (pos == MAXINPUT )
-	  {
-		cout <<"User input too long\n";
-		exit(1);
-	  }
-	  if (c == '\n' )
-		userinput[pos] = ' ';
-	  else
-		userinput[pos] = c;
-	  if (c == '(')
-		++parencnt;
-	  if (c == ')')
-	    parencnt--;
-	}
-    while (parencnt != 0 );
-} //readParens
+void readParens() {
+    int parencnt = 1;  // '(' just read
+    char c = '\0';
+    do {
+        nextchar(c);
+        if (pos >= MAXINPUT - 1) {
+            cout << "User input too long\n";
+            exit(1);
+        }
+        if (c == '\n') {
+            cout << PROMPT2;
+            userinput[pos++] = ' ';
+        } else {
+            userinput[pos++] = c;
+        }
+        if (c == '(') ++parencnt;
+        if (c == ')') --parencnt;
+    } while (parencnt != 0);
+}
+
 
 /* readInput - read char's into userinput */
 
-void readInput()
-{
-    char  c;
+void readInput() {
+    char c;
     cout << PROMPT;
-    pos = -1;
-    do
-	 {
-	    ++pos ;
-	    if (pos == MAXINPUT )
-	    {
-		    cout << "User input too long\n";
-		    exit(1);
-	    }
-	    nextchar(c);
-	    if (c == '\n' )
-		   userinput[pos] = ' ';
-	    else
-		   userinput[pos] = c;
-	    if (userinput[pos] == '(' )
-		  readParens();
-	 }
-	while (c != '\n');
-	inputleng = pos;
-	userinput[pos+1] = COMMENTCHAR; // sentinel
+    pos = 0;
+    do {
+        if (pos >= MAXINPUT - 1) {
+            cout << "User input too long\n";
+            exit(1);
+        }
+        nextchar(c);
+        userinput[pos++] = (c == '\n') ? ' ' : c;
+        if (userinput[pos-1] == '(') readParens();
+    } while (c != '\n');
+    inputleng = pos;
+    if (pos < MAXINPUT - 1) userinput[pos] = COMMENTCHAR;  // sentinel
+    else {
+        cout << "User input too long\n";
+        exit(1);
+    }
 }
+
 
 
 /* reader - read char's into userinput; be sure input not blank  */
 
-void reader ()
-{
-    do
-    {
-	  readInput();
-	  pos = skipblanks(0);
-    }
-    while( pos > inputleng); // ignore blank lines
+void reader() {
+    do {
+        readInput();
+        pos = skipblanks(0);
+    } while (pos > inputleng);  // ignore blank lines
 }
+
 
 /* parseName - return (installed) NAME starting at userinput[pos]*/
 
@@ -463,20 +453,37 @@ EXP parseExp()
     if (userinput[pos] == '(' ) {
        pos = skipblanks(pos + 1);  // Skip whitespace after the opening parenthesis
        NAME op = parseName();
+       if (op == -1) {  // Assuming parseName returns -1 on failure
+           cout << "Error: Failed to parse operator name at position " << pos << endl;
+           return nullptr;
+       }
        pos = skipblanks(pos);  // Skip any whitespace after the parsed operator name
        EXPLIST el = parseEL();
-       pos = skipblanks(pos);  // Skip any whitespace after the parsed expression list
+       if (el == nullptr && userinput[pos] != ')') {  // Check for error in parseEL (assuming parseEL returns nullptr on failure)
+           cout << "Error: Failed to parse expression list or missing closing parenthesis at position " << pos << endl;
+           return nullptr;
+       }
+       pos = skipblanks(pos + 1);  // Skip any whitespace after the parsed expression list and the closing parenthesis
        return mkAPEXP(op, el);
     }
     if (isNumber(pos)) {
        EXP e = mkVALEXP(parseVal());
+       if (e == nullptr) {  // Check for error in mkVALEXP (assuming mkVALEXP returns nullptr on failure)
+           cout << "Error: Failed to parse value at position " << pos << endl;
+           return nullptr;
+       }
        pos = skipblanks(pos);  // Skip any whitespace after the parsed value
        return e;
     }
     EXP e = mkVAREXP(parseName());
+    if (e == nullptr) {  // Check for error in mkVAREXP (assuming mkVAREXP returns nullptr on failure)
+        cout << "Error: Failed to parse name at position " << pos << endl;
+        return nullptr;
+    }
     pos = skipblanks(pos);  // Skip any whitespace after the parsed name
     return e;
 }// parseExp
+
 
 
 /* parseEL - return EXPLIST starting at userinput[pos]  */
@@ -484,20 +491,22 @@ EXP parseExp()
 EXPLIST parseEL()
 {
     pos = skipblanks(pos);
+    if (pos == 3) { return nullptr; }
+    cout << pos << endl;
     if (userinput[pos] == ')' ) {
       pos = skipblanks(pos + 1);
-      cout << pos << endl;
-      return 0;
+      
+      return nullptr; // Changed from 0 to nullptr for clarity
     }
     EXP e = parseExp();
-    if (e == nullptr) {  // Assuming parseExp() returns nullptr on failure
-        // Handle error or break recursion
-        return 0;
+    if (e == nullptr) {
+        return nullptr; // Return nullptr immediately if parseExp() fails
     }
-    pos = skipblanks(pos);  // Ensure pos is updated correctly
+    pos = skipblanks(pos);
     EXPLIST el = parseEL();
     return mkExplist(e, el); 
 }// parseEL
+
 
 
 
@@ -675,7 +684,7 @@ NUMBER applyValueOp(int op, VALUELIST vl)
         return arg1 > arg2;
     case 11:
         return arg1 < arg2;
-    default:
+    default: 
         cout << "Error: unknown operator" << endl;
         exit(1);
     }
@@ -824,34 +833,34 @@ NUMBER applyCtrlOp(int op, EXPLIST args, ENV rho)
 
 NUMBER eval(EXP e, ENV rho)
 {
-    switch (e->etype)
+    if (e->etype == VALEXP)
     {
-        case VALEXP:
-            return e->num;  // Return the number directly for value expressions.
-        case VAREXP:
+        return e->num;  // Return the number directly for value expressions.
+    }
+    else if (e->etype == VAREXP)
+    {
+        // Look up the variable in the environment and return its value.
+        VALUELIST vl = findVar(e->varble, rho);
+        if (vl != nullptr)
+            return vl->head;
+        else
         {
-            // Look up the variable in the environment and return its value.
-            VALUELIST vl = findVar(e->varble, rho);
-            if (vl != nullptr)
-                return vl->head;
-            else
-            {
-                cout << "Error: unbound variable" << endl;
-                exit(1);
-            }
-            break;
-        }
-        case APEXP:
-        {
-            // Evaluate the operator and arguments, then apply the operator to the arguments.
-            NAME op = e->optr;
-            EXPLIST args = e->args;
-            VALUELIST argValues = evalList(args, rho);
-            return applyValueOp(op - '0', argValues);
-        }
-        default:
-            cout << "Error: unknown expression type" << endl;
+            cout << "Error: unbound variable" << endl;
             exit(1);
+        }
+    }
+    else if (e->etype == APEXP)
+    {
+        // Evaluate the operator and arguments, then apply the operator to the arguments.
+        NAME op = e->optr;
+        EXPLIST args = e->args;
+        VALUELIST argValues = evalList(args, rho);
+        return applyValueOp(op - '0', argValues);
+    }
+    else
+    {
+        cout << "Error: unknown expression type" << endl;
+        exit(1);
     }
 }
 
@@ -862,26 +871,30 @@ NUMBER eval(EXP e, ENV rho)
 
 int main()
 {
-   initNames();
-   globalEnv = emptyEnv();
+    initNames();
+    cout << "Names initialized" << endl;
+   
+    globalEnv = emptyEnv();
+    cout << "Empty env created" << endl;
 
-   quittingtime = 0;
-   while (!quittingtime)
-   {
-	 reader();
-	 if ( matches(pos, 4, "quit"))
-	    quittingtime = 1;
-	 else if( (userinput[pos] == '(') &&
-		    matches(skipblanks(pos+1), 6, "define")  )
-	 {
-		    prName(parseDef());
-		    cout <<endl;
-	 }
-	 else {
-			currentExp = parseExp();
-			prValue(eval(currentExp, emptyEnv() ));
-			cout <<endl<<endl;
-		 }
+
+    quittingtime = 0;
+    while (!quittingtime) {
+    reader();
+    if ( matches(pos, 4, "quit"))
+        quittingtime = 1;
+    else if( (userinput[pos] == '(') &&
+		    matches(skipblanks(pos+1), 6, "define")  ) {
+        prName(parseDef());
+        cout <<endl;
+    }
+    else {
+        cout << "In the else block" << endl;
+        currentExp = parseExp();
+        cout << "Current expression: " << currentExp << endl;
+        prValue(eval(currentExp, emptyEnv() ));
+        cout <<endl<<endl;
+    }
 	}// while
   return 0;
 }
